@@ -237,7 +237,7 @@ class ActorNetwork_1(nn.Module):
     #             mask[i] = 0
     #     return mask
 
-    '''没有把工序的概念考虑进去'''
+
 
     def forward(self, x,mask,train=True,action=None):
         """	x: (batch, job_num, obs_dim)
@@ -274,7 +274,7 @@ class ActorNetwork_1(nn.Module):
             dist_entropy=dist.entropy()
             return action_logprobs,dist_entropy
 
-    # 注意力网络  u1：query   u2：key  ref:value
+    # attention  u1：query   u2：key  ref:value
     def glimpse(self, query, ref, mask, inf=1e9):
         u1 = self.W_q(query).unsqueeze(-1).repeat(1, 1, ref.size(1))  # u1: (batch, 128, city_t)
         u2 = self.W_ref(ref.permute(0, 2, 1))  # u2: (batch, 128, city_t)

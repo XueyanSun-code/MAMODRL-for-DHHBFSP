@@ -2,8 +2,7 @@ import numpy as np
 # import torch
 Penalty=1e-6
 from meta_Initialization import Initializations
-from Pdjaya_2023 import PdJaya
-from MOEAD2023 import MOEAD
+
 
 class Rules:
     def __init__(self,device,args,machine_on_stage,fac_factor, energy_fac):
@@ -71,49 +70,6 @@ class Rules:
 
         return decided_job_num
 
-    def Pdjaya2023(self,UC_job,shop_id):
-        ##将UC_job的工件加工时间和due date
-        numjobs = len(UC_job)
-        # numstage = 4 ##本文的环境设置中，阶段为4
-        process_time_UC = []
-        for i in range(numjobs):
-            process_time_UC.append(UC_job[i].process_time)
-
-
-        order = list(range(1, numjobs + 1))
-        polulation_size = 10
-        process_time_ = np.array(process_time_UC)
-        HGA = PdJaya(polulation_size,0.1,numjobs, self.args.max_stage, self.machine_on_stage[shop_id], process_time_,self.time_f[shop_id],self.energy_fac[shop_id])
-        rounds = HGA.PdJaya_running(shop_id)
-        ##根据多个可能排序，找出一个较好的.或随机，或根据方向
-        # rand = np.random.randint(len(HGA.PF))
-        # print('PF',HGA.PF)
-        sequence = HGA.PF[0]
-        # print(sequence)
-        decided_job_num = sequence[0]
-        return decided_job_num-1
-
-    def MOEAD2023(self,UC_job,shop_id):
-        ##将UC_job的工件加工时间和due date
-        numjobs = len(UC_job)
-        if numjobs == 1:
-            decided_job_num = numjobs
-        else:
-            # numstage = 4 ##本文的环境设置中，阶段为4
-            process_time_UC = []
-            for i in range(numjobs):
-                process_time_UC.append(UC_job[i].process_time)
-    
-            order = list(range(1, numjobs + 1))
-            polulation_size = 10
-            process_time_ = np.array(process_time_UC)
-            HGA = MOEAD(polulation_size,0.1,numjobs, self.args.max_stage, self.machine_on_stage[shop_id], process_time_,self.time_f[shop_id],self.energy_fac[shop_id])
-            rounds = HGA.MOEAD_running(shop_id)
-            ##根据多个可能排序，找出一个较好的.或随机，或根据方向
-            rand = np.random.randint(len(HGA.PF))
-            sequence = HGA.PF[rand]
-            decided_job_num = sequence[0]
-        return decided_job_num-1
 
 
 

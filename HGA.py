@@ -6,7 +6,7 @@ import copy
 import matplotlib.pyplot as plt
 from Initialization import Initializations
 
-plt.style.use('seaborn-v0_8')
+plt.style.use('seaborn-white')
 
 class BigroupGeneticAlgorithm():
     def __init__(self, ND,ps,sr1,sr2,mr,rate_high,numfactory, numjob, numstage, nummachine, process_time):

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 
-plt.style.use('seaborn-v0_8')
+plt.style.use('seaborn-white')
 
 class Initializations():
     def __init__(self,numfactory, numjob, numstage, nummachine, process_time):

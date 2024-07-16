@@ -14,7 +14,7 @@ from mpl_toolkits.axes_grid1 import host_subplot
 
 def plot_acc_loss(loss,f,i):
     host = host_subplot(111)  # row=1 col=1 first pic
-    plt.subplots_adjust(right=0.8)  # ajust the right boundary of the plot window
+    plt.subplots_adjust(right=0.8)  # adjust the right boundary of the plot window
 
     # set labels
     host.set_xlabel("episode")
@@ -43,7 +43,7 @@ def running():
     parser.add_argument('--state_num', type=int, default=7, help='the dimension of input')
     parser.add_argument('--rule_num', type=int, default=6, help='the number of rules')
     parser.add_argument('--buffer_size', type=int, default=10000, help='buffer size')
-    parser.add_argument('--batch_size', type=int, default=256, help='batch size')
+    parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--Initial_jobs', type=int, default=30, help='Initial_jobs')
 
     parser.add_argument('--max_operation_time', type=int, default=20, help='max time of each operation')
@@ -67,7 +67,7 @@ def running():
     parser.add_argument('--gamma', default=0.99)
     # parser.add_argument('--pr', default=pr)
     parser.add_argument('--print_interval', type=int, default=60)
-    parser.add_argument('--episode', type=int, default=8000)
+    parser.add_argument('--episode', type=int, default=200)
     parser.add_argument('--learning_rate', default=0.01)
     parser.add_argument('--tor', default=0.001, help='the update level of target_net')
     parser.add_argument('--device', type=str, default=device)
@@ -85,7 +85,7 @@ def running():
 
     args = parser.parse_args()
 
-    print('开始仿真')
+    print('Start simulation')
 
     actor_dims = []
 
@@ -125,7 +125,7 @@ def running():
 
 
     for ep_num in range(args.episode):
-        print('第', ep_num, 'episode')
+        print('The', ep_num, 'episode')
         env = enviroment()
         device = torch.device(args.device)
         train = Trainer_dqn(env, device, args, ep_num, maddpg_agents, memory, total_steps, evaluate, machine_on_stage,

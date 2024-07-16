@@ -37,7 +37,7 @@ class MADQN:
     def choose_action(self, raw_obs,mask,shop_ID):
 
         for agent_idx, agent in enumerate(self.agents):
-            if agent_idx == shop_ID:##只在当前的车间进行工件选择
+            if agent_idx == shop_ID:
                 action = agent.choose_action(raw_obs,mask)
                 # action = action[0]
 
@@ -66,7 +66,7 @@ class MADQN:
             if not memory.ready(agent_id):
                 return
             self.training_num[agent_id] += 1
-            print("agent_id=%d,第%d次训练" % (agent_id, self.training_num[agent_id]))
+            print("agent_id=%d,the %d training" % (agent_id, self.training_num[agent_id]))
             actor_states,actor_mask,actor_new_states,actor_new_mask,actions, rewards, dones = memory.sample_buffer(agent_id)
 
             device = self.agents[0].critic.device

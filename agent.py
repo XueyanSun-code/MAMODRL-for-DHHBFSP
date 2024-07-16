@@ -78,7 +78,7 @@ class Agent:
         self.critic.load_checkpoint()
         self.target_critic.load_checkpoint()
 
-##更改2019Yang的论文
+
 class Agent_DDQN:
     def __init__(self,  args, agent_idx, chkpt_dir,alpha=0.01, gamma=0.95, tau=0.01):
         # self.model = model
@@ -170,7 +170,7 @@ class Agent_dqn:
         # self.n_actions = n_actions
         self.agent_name = 'agent_%s' % agent_idx
         self.args = args
-        self.activite = True##表示当前的agent的状态可以进行工件选择，没有正在加工的工件
+        self.activite = True
 
         self.critic = CriticNetwork_dqn(args,alpha,
                             chkpt_dir=chkpt_dir, name=self.agent_name+'_critic')
@@ -231,7 +231,7 @@ class Agent_td3:
         # self.n_actions = n_actions
         self.agent_name = 'agent_%s' % agent_idx
         self.args = args
-        self.activite = True##表示当前的agent的状态可以进行工件选择，没有正在加工的工件
+        self.activite = True
         self.actor = ActorNetwork_1(args,alpha,
                                   chkpt_dir=chkpt_dir, name=self.agent_name+'_actor')
         self.critic1 = CriticNetwork(args,alpha,

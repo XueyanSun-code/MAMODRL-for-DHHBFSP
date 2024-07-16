@@ -18,14 +18,14 @@ class JobShop:
         self.machines_start_finish_blocking_time = self.init_time_count()
         self.machine_release_time, self.machine_joblist = self.ini_machine_release_time()
         self.episode_end = self.env.event()
-        self.activite = True  ##表示当前的agent的状态可以进行工件选择，没有正在加工的工件
-        self.obs = np.zeros((self.args.max_job, self.args.max_stage + 9))
+        self.activite = True
+        self.obs = np.zeros((self.args.max_job, self.args.max_stage + 7))
         self.mask = np.zeros(self.args.max_job)
         self.done = False
         self.new_arrvial = False
         self.num = number
         self.factor = factor
-        self.energy_fac = energy_fac#每个阶段的机器的能耗相同
+        self.energy_fac = energy_fac
 
 
 
@@ -90,10 +90,10 @@ class JobShop:
         estimated_value = []
         for i, job in enumerate(AUC_job):
             estimated_value.append(job.D - self.env.now - sum(job.process_time))
-        selected_job_list = range(len(AUC_job))  ##根据现有工件进行重新顺序编号，1，2，3，4，
+        selected_job_list = range(len(AUC_job))
         selected_job_list = sorted(selected_job_list, key=lambda k: estimated_value[k - 1])
         selected_job_list = selected_job_list[:self.args.max_job]
-        ##按照顺序找出最终的UC——jobs
+        ##find UC——jobs
         UC_jobs = []
         for j in selected_job_list:
             UC_jobs.append(AUC_job[j])
@@ -110,71 +110,11 @@ class JobShop:
                 count += 1
         return UC_job
 
-    def calculate_input_sequence(self, jobs, machines):
-        n = len(jobs)
-        m = len(machines)
-        U = torch.zeros(m).to(self.device)
-        CT = torch.zeros(m).to(self.device)
-        for index,machine in enumerate(machines):
-            starting_time = machine.machine_starting_time
-            finishing_time = machine.machine_finishing_time
-            U[index]=torch.sum(finishing_time-starting_time)
-            CT[index]=max(machine.machine_finishing_time[machine.point-1],self.env.now)
-            if CT[index] == 0:
-                CT[index] = 1
-        U = torch.div(U, CT)
-        '''机器的平均利用率、机器利用率的标准差'''
-        Uave = torch.div(torch.sum(U),torch.tensor(m))
-        Ustd = torch.std(U)
-
-        OP = torch.zeros(n).to(self.device)
-        ni = torch.zeros(n).to(self.device)
-        for index,job in enumerate(jobs):
-            OP[index]=job.count
-            ni[index]=job.ni
-        CRJ = torch.div(OP,ni)
-        '''工序的平均完成率、工件的平均完成率、攻坚完成率的方差'''
-        CROave = torch.div(torch.sum(OP),torch.sum(ni))
-        CRJave = torch.div(torch.sum(CRJ),torch.tensor(n))
-        CRJstd = torch.std(CRJ)
-
-        Tcur = torch.div(torch.sum(CT), torch.tensor(m))
-        Ntard = 0
-        Nleft = 0
-        for i in range(n):
-            if OP[i] < ni[i]:
-                Nleft += ni[i] - OP[i]
-                Tleft = 0
-                for j in range(OP[i].int().item()+1, ni[i].int().item()+1):
-                    tij_ave = jobs[i].calculate_mean_tij(j)
-                    Tleft += tij_ave
-                    if Tcur + Tleft > jobs[i].D:
-                        Ntard += ni[i] - j + 1
-                        break
-        '''估计的延迟率  估计延迟的未加工序/所有未加工的工序'''
-        if Nleft == 0:
-            Tard_e = 1
-        else:
-            Tard_e = Ntard/Nleft
-
-        '''实际的延迟率  实际延迟的未加工序/所有未加工的工序'''
-        Ntard = 0
-        for i in range(n):
-            if OP[i] < ni[i]:
-                if max(jobs[i].operation_finishing_time[OP[i].int().item() - 1],self.env.now) > jobs[i].D:
-                    Ntard += ni[i] - OP[i]
-        if Nleft == 0:
-            Tard_a=1
-        else:
-            Tard_a = Ntard/Nleft
-
-        input_sequence = torch.tensor([Uave, Ustd, CROave, CRJave, CRJstd, Tard_e, Tard_a]).to(self.device)
-        return input_sequence
 
     def choose_machine(self,decided_job):
-        '''选择工序'''
+        '''choosing operation'''
         decided_operation = int(decided_job.count + 1)
-        '''选择机器'''
+        '''choosing machine'''
         # process_information = decided_job.processing_information
         machine_evaluate = torch.zeros(self.gantt_machine[0]).to(self.device)
         candidate_machine = torch.zeros(self.gantt_machine[0]).to(self.device)
@@ -182,17 +122,17 @@ class JobShop:
         for index in range(self.gantt_machine[0]):
 
             candidate_machine[count] = index + 1
-            # np.array([1, 2, 3], dtype=np.int64)
+
             machine_evaluate[count] = torch.max(torch.tensor([
                 self.machines[index].machine_finishing_time[self.machines[index].point - 1], decided_job.A,
-                decided_job.operation_finishing_time[decided_job.count - 1]]).to(self.device))
+                decided_job.operation_finishing_time[decided_job.count - 1]]))
             count += 1
-        ##选择最小的开始时间，或者第一个最小开始时间的机器
+
         decided_machine = candidate_machine[torch.argmin(machine_evaluate[:count])].int()
         return decided_operation, decided_machine
 
     # 创建下一工序的加工进程
-    def execute_rules(self, env, rule, machines):  # 执行规则后需要更新环境 参数t, i,j,tij，然后计算下一状态特征值  如果有新工件到需要更新工件列表
+    def execute_rules(self, env, rule, machines):
         decided_job, decided_operation, decided_machine = 0, 0, 0
 
 
@@ -206,17 +146,16 @@ class JobShop:
 
         return decided_job_num, decided_operation, decided_machine
 
-    def observations(self,UC_job,reward,rew_list,ep_num):
+
+    def observations(self,UC_job,reward,rew_list):
         if self.activite:
-            # UC_job = self.get_new_uncompleted_jobs()
             UC = []
             for job in UC_job:
                 UC.append(job.number)
-            # print('af', UC)
 
-            ##计算每个工件的blocking time
+
             bolcking_T, sign_pos = self.estimated_blocking_time(UC_job,self.env.now)
-            ##获取每个工件的duedate与当前时间的差值，以及标志位
+
             TD = self.time_difference(UC_job,self.env.now)
 
             for i,job in enumerate(UC_job):
@@ -229,13 +168,7 @@ class JobShop:
                 self.obs[i][self.args.max_stage + 4] = reward[1]
                 self.obs[i][self.args.max_stage + 5] = rew_list[i][0]
                 self.obs[i][self.args.max_stage + 6] = rew_list[i][1]
-                # 以下是PPO两个
-                if ep_num%2 == 0:
-                    self.obs[i][self.args.max_stage + 7] = 0.7
-                    self.obs[i][self.args.max_stage + 8] = 0.3
-                else:
-                    self.obs[i][self.args.max_stage + 7] = 0.3
-                    self.obs[i][self.args.max_stage + 8] = 0.7
+
             self.mask *= 0
             self.mask[:len(UC_job)] += 1
 
@@ -245,7 +178,7 @@ class JobShop:
 
         return self.obs, self.mask
 
-    '''这里的reward是向量'''
+    '''reward is a vector'''
     def reward(self,job,machine_num):
         ##计算abs（tardiness）
         reward = np.zeros(2)
@@ -324,27 +257,6 @@ class JobShop:
         return blocking, sign_pos
 
 
-    def calculate_reward(self, input, next_input):
-        if next_input[6] < input[6]:
-            return 1
-        else:
-            if next_input[6] > input[6]:
-                return -1
-            else:
-                if next_input[5] < input[5]:
-                    return 1
-                else:
-                    if next_input[5] > input[5]:
-                        return -1
-                    else:
-                        if next_input[0] > input[0]:
-                            return 1
-                        else:
-                            if next_input[0] > input[0] * 0.95:
-                                return 0
-                            else:
-                                return -1
-
     def job_distribution(self,lam, add_job):
         exp_distribution = np.around(np.random.exponential(lam, size=add_job)).astype(int)  # 50 个参数为 lam 的指数分布随机数
         #exp_distribution = np.concatenate(([0], exp_distribution))
@@ -363,7 +275,7 @@ class JobShop:
         processing_information = np.zeros(self.gantt_machine[0])
 
         all_process_time = np.random.randint(1, max_operation_time,size=self.stage)
-        ##继续产生其他阶段的加工时间
+
 
         for i in range(self.gantt_machine[0]):
             # print('all', all_process_time[0])

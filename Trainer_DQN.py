@@ -2,22 +2,14 @@ import copy
 
 from Machine import Machine
 from JobShop import JobShop
-from DDQN import DDQN
 import torch
-from buffer import ReplayBuffer
-from Gantt import Gante
-# from torch.utils.tensorboard import SummaryWriter
+
+
 import numpy as np
 from HGA import BigroupGeneticAlgorithm
 from Job import Job
-# from maddpg import MADDPG
-from madqn import MADQN
-from buffer_DDPG import MultiAgentReplayBuffer
-import simpy
+
 from Normalizations import RewardScaling, Normalization
-
-
-# import matplotlib.pyplot as plt
 
 
 class Trainer_dqn:
@@ -50,7 +42,6 @@ class Trainer_dqn:
         self.multiShop = [
             JobShop(self.device, env, self.args, self.stage, self.machine_on_stage[i], i, fac_factor[i], energy_fac[i])
             for i in range(args.shop_num)]
-        self.gante = Gante()
 
         self.mean_loss = torch.zeros(args.episode).to(self.device)
         self.ep_count = 0
@@ -59,7 +50,7 @@ class Trainer_dqn:
                     self.args.epsilon_start - self.args.epsilon_final) / self.args.epsilon_decay
         self.new_job = []
         self.new_arrvial = False
-        ##这里产生的是add_job个时间间隔，但是因为后面两个进程中都有new-comer。所以会产生同时产生两个新工件，导致多加了一个工件，因此，在产生新工件时，增加一个随机时间扰动
+
         self.exp_distribution = self.job_distribution(self.args.lam, self.args.add_job)
         self.add = 0
         # self.reward = 0
@@ -80,7 +71,6 @@ class Trainer_dqn:
         self.multi_rew_scaling = [RewardScaling(2, 0.95) for _ in range(args.shop_num)]
         self.multi_obs = [Normalization((args.max_job, args.max_stage + 7)) for _ in range(args.shop_num)]
 
-        ##全局状态
 
         for i in range(self.args.shop_num):
             self.env.process(self.whole(i))
@@ -113,7 +103,7 @@ class Trainer_dqn:
         self.job_list, fitness = HGA.BGA_running()
 
 
-    # 根据截止对工件进行排序，知道所有机器无空闲
+
     def Initial_patching(self, shop_ID):
 
         candidate = list(range(len(self.multiShop[shop_ID].jobs)))
@@ -144,13 +134,13 @@ class Trainer_dqn:
 
     def train_and_test(self, shop_ID):
         self.ep_count = 0
-        # self.losses=torch.zeros(self.args.max_operation_number*(self.args.Initial_jobs+self.args.add_job)).to(self.device)
+
         self.env.reset_now(0)
         self.multiShop[shop_ID].jobs = []
 
 
         for number, job in enumerate(self.job_list[shop_ID]):
-            print(self.process_time[job - 1])
+            # print(self.process_time[job - 1])
             self.multiShop[shop_ID].jobs.append(
                 self.multiShop[shop_ID].creat_job(self.args.DDT, self.process_time[job - 1], job, number,
                                                   self.env.now, 0))
@@ -190,7 +180,7 @@ class Trainer_dqn:
         return job
 
     def job_distribution(self, lam, add_job):
-        exp_distribution = np.around(np.random.exponential(lam, size=add_job)).astype(int)  # 50 个参数为 lam 的指数分布随机数
+        exp_distribution = np.around(np.random.exponential(lam, size=add_job)).astype(int)
         # exp_distribution = np.concatenate(([0], exp_distribution))
         return exp_distribution
 
@@ -199,9 +189,9 @@ class Trainer_dqn:
         yield operation
         # print('finish time', self.env.now,'shop_ID',shop_ID)
         if not self.new_arrvial:
-            self.env.process(self.executing_ddqn1(epsilon, shop_ID))
+            self.env.process(self.executing_dqn1(epsilon, shop_ID))
         else:
-            self.env.process(self.executing_MADDPG(epsilon, shop_ID))
+            self.env.process(self.executing_madqn(epsilon, shop_ID))
         end1 = 0
         for job in self.multiShop[shop_ID].jobs:
             end1 += job.finished
@@ -243,13 +233,13 @@ class Trainer_dqn:
         return obs, mask
 
     def get_reward(self, decided_job, shop_id, machine_num):
-        ##当前step的即时reward
+
 
         reward = self.multiShop[shop_id].reward(decided_job, machine_num)
         return reward
 
     def get_done(self, shop_id):
-        ##判断当前的车间的工件和新工件是否全部完成
+
         done = False
         end1 = 0
 
@@ -268,7 +258,7 @@ class Trainer_dqn:
             state = np.concatenate([state, obs])
         return state
 
-    def executing_MADDPG(self, epsilon, shop_ID):
+    def executing_madqn(self, epsilon, shop_ID):
         yield self.env.timeout(0)
 
         UC_job = self.multiShop[shop_ID].get_new_uncompleted_jobs(self.new_job)
@@ -286,9 +276,8 @@ class Trainer_dqn:
                 obj_list.append(obj)
             obs, mask = self.get_obs(shop_ID, UC_job, reward_list)
 
-            ##根据当前的状态选择工件进行加工，这里的action是UCjob的顺序号，需要转换,且目标值需要减去1
             action = self.maddpg.choose_action(obs, mask, shop_ID)
-            # print(actions[shop_ID][0])
+
             decided_job = UC_job[action]
             decided_operation, decided_machine = self.multiShop[shop_ID].choose_machine(decided_job)
             reward = reward_list[action]
@@ -299,7 +288,6 @@ class Trainer_dqn:
                     decided_job.create_operation_process(self.multiShop[shop_ID], decided_machine, self.factor))
                 decided_job.update_operation_process(decided_operation, operation)
                 yield self.env.timeout(0)
-                # 当工序进程结束后会执行规则
                 self.env.process(self.operation_finished(operation, epsilon, shop_ID))
                 yield self.env.timeout(0)
                 obs_ = copy.deepcopy(obs)
@@ -308,19 +296,17 @@ class Trainer_dqn:
                 mask_[action] = 0
 
                 reward_o = self.multi_rew_scaling[shop_ID].__call__(reward)
-                # gamma = 0.95
-                # reward = reward_o + self.args.pr * self.gamma_reward  ##经过scaling的单步reward加上前面的reward的影响
+
                 self.reward = reward_o  ##保存当前一步获得的总reward值
                 self.rew_store[shop_ID][self.actor_store_index[shop_ID]] = reward
                 self.actor_store_index[shop_ID] += 1
-                # self.gamma_reward = self.args.pr * (reward_o + self.gamma_reward)  ##更新前面所有reward的影响值
                 self.episode_rew += reward
                 self.step += 1
 
                 # self.actor_reward_mamory[shop_ID].append(reward)
                 done = self.get_done(shop_ID)
 
-                ##这里的obs需要flatten
+                ##这里的bs需要flatten
                 self.memory.store_transition(obs.flatten(), mask, action, reward, obs_.flatten(), mask_, done, shop_ID)
                 if self.total_steps % 20 == 0 and not self.evaluate:
 
@@ -334,7 +320,8 @@ class Trainer_dqn:
 
                     self.maddpg.save_checkpoint()
 
-    def executing_ddqn1(self, epsilon, shop_ID):
+##before new job arrival
+    def executing_dqn1(self, epsilon, shop_ID):
         yield self.env.timeout(0)
         rule = self.rule  # self.ddqn.act(self.state, epsilon)
         UC_job = self.multiShop[shop_ID].get_uncompleted_jobs()
